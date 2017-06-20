@@ -512,11 +512,11 @@ ZeroAxes:
 
     IF &DEBUG_MODE = 1 THEN PRINT "    New Zero Point : [", &pos_x_zero, ", ", &pos_y_zero, ", ", &pos_z_zero, "]"
 
-    VA &pos_x_trigger + &PLATE_LENGTH_X, &pos_y_trigger + &PLATE_LENGTH_Y, &pos_z_trigger + &PLATE_LENGTH_Z
+    VA &pos_x_zero, &pos_y_zero, &pos_z_zero
     PAUSE 1
 
-    IF &DEBUG_MODE = 1 THEN PRINT "    Moving to new zero-point..."
     ' Go to the new [0, 0, -0.5] point
+    IF &DEBUG_MODE = 1 THEN PRINT "    Moving above new zero-point..."
     IF &is_metric = 0 THEN JZ, -0.5
     IF &is_metric = 1 THEN JZ, -12.7
     J2, 0, 0
@@ -553,7 +553,7 @@ ConvertToMetric:
     &PLATE_LENGTH_Y = &PLATE_LENGTH_Y * 25.4
     &PLATE_LENGTH_Z = &PLATE_LENGTH_Z * 25.4
     &MAX_SPEED_JOGGING = &MAX_SPEED_JOGGING * 25.4
-    &MAX_SPEED_APPROACH = &MAX_SPEED_JOGGING * 25.4
+    &MAX_SPEED_APPROACH = &MAX_SPEED_APPROACH * 25.4
 
     IF &DEBUG_MODE = 1 THEN PRINT "        Metric Plate Dimensions (mm) : [", &PLATE_LENGTH_X, ", ", &PLATE_LENGTH_Y, ", ", &PLATE_LENGTH_Z, "]"
     IF &DEBUG_MODE = 1 THEN PRINT "        Metric Speed Limits (mm/sec) : ", &MAX_SPEED_APPROACH, " (Approach), ", &MAX_SPEED_JOGGING, " (Jogging)"
