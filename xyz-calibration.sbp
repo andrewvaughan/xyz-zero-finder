@@ -205,7 +205,7 @@ CheckState:
 
     IF &DEBUG_MODE = 1 THEN PRINT "    Home Position : [", &pos_home_x, ", ", &pos_home_y, ", ", &pos_home_z, "]"
 
-    ' Set the limits for each of our axis in the direction we are testing
+    ' Set the limits for each of our axes in the direction we are testing
     &pos_x_limit_min = %(11)
     &pos_x_limit_max = %(12)
     &pos_y_limit_min = %(13)
@@ -216,7 +216,7 @@ CheckState:
     IF &DEBUG_MODE = 1 THEN PRINT "    Minimum Limit : [", &pos_x_limit_min, ", ", &pos_y_limit_min, ", ", &pos_z_limit_min, "]"
     IF &DEBUG_MODE = 1 THEN PRINT "    Maximum Limit : [", &pos_x_limit_max, ", ", &pos_y_limit_max, ", ", &pos_z_limit_max, "]"
 
-    ' Our trigger is 0 by default
+    ' Set our trigger locations to zero
     &pos_x_trigger = 0
     &pos_y_trigger = 0
     &pos_z_trigger = 0
@@ -230,7 +230,7 @@ CheckState:
     IF &DEBUG_MODE = 1 THEN PRINT "    ShopBot XY Speeds     : ", &shopbot_xy_move, " (Move), ", &shopbot_xy_jog, " (Jog)"
     IF &DEBUG_MODE = 1 THEN PRINT "    ShopBot Z Speeds      : ", &shopbot_z_move, " (Move), ", &shopbot_z_jog, " (Jog)"
 
-    ' Set our speed limits, using configured settings unless they exceed our configured speed limit
+    ' Set our speed limits, using configured settings, unless they exceed our configured speed limit
     &speed_xy_approach = &shopbot_xy_move
     &speed_z_approach = &shopbot_z_move
     &speed_xy_jog = &shopbot_xy_jog
@@ -251,12 +251,12 @@ CheckState:
     ' If we're in preview mode, throw an exception
     IF %(22) = 1 THEN GOTO ExceptionPreviewMode
 
-    ' Put the ShopBot in Absolute mode (so all distances are entered from 0,0)
+    ' Put the ShopBot in Absolute mode (all points are measured from 0,0,0 while moving or jogging)
     IF &DEBUG_MODE = 1 THEN PRINT "    Entering Absolute Dimension mode..."
     SA
     IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
 
-    ' Deactivate our hardware and software limits
+    ' Deactivate both the hardware and software limits
     IF &DEBUG_MODE = 1 THEN PRINT "    Disabling limit switches..."
     VN, 0
     SF, 0
@@ -284,7 +284,7 @@ ResetState:
     ' Reset the spindle movement speeds
     IF &DEBUG_MODE = 1 THEN PRINT "    Resetting spindle movement speeds..."
     IF &shopbot_xy_move NOT 0 THEN MS, &shopbot_xy_move, &shopbot_z_move
-    IF &shopbot_xy_jog NOT 0 JS, &shopbot_xy_jog, &shopbot_z_jog
+    IF &shopbot_xy_jog NOT 0 THEN JS, &shopbot_xy_jog, &shopbot_z_jog
     IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
 
     ' Put the ShopBot in relative mode
@@ -312,7 +312,7 @@ CalibrateZAxis:
     ' Make sure our input is not live
     GOSUB TestClear
 
-    ' Approach the Z limit, running the Trigger subroutine when the bit touches the zeroing plate
+    ' Approach the Z limit, calling the Trigger subroutine when the bit touches the zeroing plate
     IF &DEBUG_MODE = 1 THEN PRINT "    Testing first-pass along the Z-axis..."
     ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateZAxisTriggered
     MZ, &pos_z_limit_max
@@ -336,6 +336,8 @@ CalibrateZAxis:
 
     ' Calculate the Z-Axis position for testing the X- and Y-Axes
     &pos_z_test_point = &pos_z_trigger + &PLATE_Z_LENGTH
+    IF &is_metric = 0 THEN &pos_z_test_point = &pos_z_test+point + 0.25
+    IF &is_metric = 1 THEN &pos_z_test_point = &pos_z_test_point + 6.35
 
     ' Reset our Z-Axis move speed and go home
     MS, , &speed_z_move
@@ -383,7 +385,7 @@ CalibrateXAxis:
     JZ, &pos_z_test_point
     IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
 
-    ' Approach the X limit, running the Trigger subroutine when the bit touches the zeroing plate
+    ' Approach the X limit, calling the Trigger subroutine when the bit touches the zeroing plate
     IF &DEBUG_MODE = 1 THEN PRINT "    Testing first-pass along the X-axis..."
     ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateXAxisTriggered
     MX, &pos_x_limit_max
@@ -451,7 +453,7 @@ CalibrateYAxis:
     JZ, &pos_z_test_point
     IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
 
-    ' Approach the Y limit, running the Trigger subroutine when the bit touches the zeroing plate
+    ' Approach the Y limit, calling the Trigger subroutine when the bit touches the zeroing plate
     IF &DEBUG_MODE = 1 THEN PRINT "    Testing first-pass along the Y-axis..."
     ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateYAxisTriggered
     MX, &pos_y_limit_max
