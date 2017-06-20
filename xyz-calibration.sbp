@@ -80,8 +80,8 @@
 GOSUB LoadConstants         ' Loads constants used by this script
 
 Restart:
-GOSUB ResetState            ' Reset our state (in case we're restarting)
-GOSUB CheckState            ' Ensure the ShopBot is in an appropriate state
+GOSUB ResetState            ' Reset the ShopBot's state (in case we're restarting)
+GOSUB CheckState            ' Ensure the ShopBot is in an appropriate configuration for calibration
 
 GOSUB CalibrateZ            ' Calibrates the Z-Axis (must be performed prior to X- and Y-Axis calibration)
 GOSUB CalibrateX            ' Calibrates the X-Axis
@@ -90,7 +90,7 @@ GOSUB CalibrateY            ' Calibrates the Y-Axis
 GOSUB ZeroAxes              ' Stores the calibrated axes as the new zero-point
 
 Stop:
-GOSUB ResetState            ' Reset the state to its original settings
+GOSUB ResetState            ' Reset the ShopBot to its original settings
 ENDALL
 
 
@@ -110,7 +110,7 @@ GOTO Stop
 ExceptionNotClear:
     IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Input Not Clear ***********************"
     PLAY C:\Windows\Media\ding.wav
-    MSGBOX(Cannot Continue!  The input for zeroing is stuck on.  Please check that there is not a short in the circuit and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+    MSGBOX(Cannot Continue!  The input for zeroing is stuck in the on position.  Please check that there is not a short in the circuit, and that the spindle and bit are not touching the zeroing plate, and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
     IF &msganswer = "Retry" THEN GOTO Restart
 GOTO Stop
 
@@ -124,7 +124,7 @@ GOTO Stop
 ExceptionLimitReached:
     IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Axis Limit Reached ********************"
     PLAY C:\Windows\Media\ding.wav
-    MSGBOX(Cannot Continue!  The limit of the axis currently being calibrated has been reached.  Please check that the zeroing plate is properly placed and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+    MSGBOX(Cannot Continue!  One of the ShopBot axis limits has been reached.  Please check that the zeroing plate is properly placed, and that your material is far enough away from the edges to allow calibration, and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
     IF &msganswer = "Retry" THEN GOTO Restart
 GOTO Stop
 
