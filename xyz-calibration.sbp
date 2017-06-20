@@ -1,0 +1,588 @@
+' ====================================================================================================================
+' XYZ Calibration Script for ShopBot
+'
+' This script is intended to be used with a zeroing plate.  The script will use the plate, tied to one of the inputs
+' on the ShopBot, to determine the zero-values for each of the X-, Y-, and Z-Axes.  To run this script, please follow
+' these directions:
+'
+'     1) Connect the wire on the zeroing plate to the proper input on the ShopBot
+'     2) Clip the ground alligator clip on the zeroing plate to a metal piece on the ShopBot that connects to the bit
+'     3) Using the ShopBot move controls, position the bit above the main (elevated) part of the zeroing plate
+'     4) Run this script using the ShopBot control application
+'
+' Zeroing Plate Dimensions:
+'
+'  * &PLATE_X_LENGTH is the length of the extrusion along the X-Axis
+'  * &PLATE_Y_LENGTH is the length of the extrusion along the Y-Axis
+'  * &PLATE_Z_LENGTH is the depth of the upper-part of the zeroing-plate
+'
+'  +----------------------------+
+'  |                            |\   ◀  X  ▶
+'  |                            | +----------+\
+'  |                            | |          | |
+'  |                            | |          | |
+'  |                            |\|<--Z      | |
+'  |                            | |          | |
+'  |                            | |          | |
+'  |                            | |          | |
+'  |                         ,__-__.         | |
+'  |                        /       \        | |
+'  +-----------------------|         |       | |
+'   \_______________________\       /        | |
+' ▲ |                        '--_--'         | |
+' Y |                                        | |
+' ▼ +----------------------------------------+ |
+'    \________________________________________\,
+'
+'
+' This script is based on ShopBot's Zero.sbp script and Barry Rimmer's xyz-zero program.
+'
+' Contributors:
+'     * Ron Olson <tachoknight@gmail.com>
+'     * Andrew Vaughan <hello@andrewvaughan.io>
+'
+' References:
+'     * OpenBSP Programming Handbook: http://www.opensbp.com/files/ComRef.pdf
+'     * ShopBot Programming Handbook: https://www.shopbottools.com/ShopBotDocs/files/SBG00314150707ProgHandWin.pdf
+' ====================================================================================================================
+
+
+' ********************************************************************************************************************
+' SETTINGS
+'
+' Modify this section to match your specific environment.  All measurements should be taken in inches.  The script
+' will automatically adjust if the ShopBot is being used in Metric mode.
+' ********************************************************************************************************************
+
+' Set to 1 to see debug messages, or 0 to suppress them
+&DEBUG_MODE = 1
+
+' Measurement of the length of the plate extrusion along the X-Axis (inches)
+&PLATE_LENGTH_X = 3.5 - 0.044
+
+' Measurement of the length of the plate extrusion along the Y-Axis (inches)
+&PLATE_LENGTH_Y = 3.5 - 0.072
+
+' The exact thickness of the upper part of the aluminum plate (inches)
+&PLATE_LENGTH_Z = 0.5 + 0.030
+
+' Speed limits for the machine when on approach and when jogging (inches/second)
+&MAX_SPEED_JOGGING = 3.5
+&MAX_SPEED_APPROACH = 0.25      ' Final-Approach will be half this speed
+
+
+
+
+' ********************************************************************************************************************
+' MAIN SCRIPT (Do not modify below this line)
+' ********************************************************************************************************************
+
+GOSUB LoadConstants         ' Loads constants used by this script
+
+Restart:
+GOSUB ResetState            ' Reset our state (in case we're restarting)
+GOSUB CheckState            ' Ensure the ShopBot is in an appropriate state
+
+GOSUB CalibrateZ            ' Calibrates the Z-Axis (must be performed prior to X- and Y-Axis calibration)
+GOSUB CalibrateX            ' Calibrates the X-Axis
+GOSUB CalibrateY            ' Calibrates the Y-Axis
+
+GOSUB ZeroAxes              ' Stores the calibrated axes as the new zero-point
+
+Stop:
+GOSUB ResetState            ' Reset the state to its original settings
+ENDALL
+
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' EXCEPTIONS
+' --------------------------------------------------------------------------------------------------------------------
+
+ExceptionPreviewMode:
+    IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Preview Mode **************************"
+    PLAY C:\Windows\Media\ding.wav
+    MSGBOX(Cannot Continue!  ShopBot in Preview Mode.  Please check that the ShopBot is turned on and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+    IF &msganswer = "Retry" THEN GOTO Restart
+GOTO Stop
+
+ExceptionNotClear:
+    IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Input Not Clear ***********************"
+    PLAY C:\Windows\Media\ding.wav
+    MSGBOX(Cannot Continue!  The input for zeroing is stuck on.  Please check that there is not a short in the circuit and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+    IF &msganswer = "Retry" THEN GOTO Restart
+GOTO Stop
+
+ExceptionZNotCalibrated:
+    IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Z-Axis Not Calibrated *****************"
+    PLAY C:\Windows\Media\ding.wav
+    MSGBOX(Cannot Continue!  The Z-Axis must be calibrated prior to calibrating the X or Y axes., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+    IF &msganswer = "Retry" THEN GOTO Restart
+GOTO Stop
+
+ExceptionLimitReached:
+    IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Axis Limit Reached ********************"
+    PLAY C:\Windows\Media\ding.wav
+    MSGBOX(Cannot Continue!  The limit of the axis currently being calibrated has been reached.  Please check that the zeroing plate is properly placed and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+    IF &msganswer = "Retry" THEN GOTO Restart
+GOTO Stop
+
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: LoadConstants
+' --------------------------------------------------------------------------------------------------------------------
+
+LoadConstants:
+    IF &DEBUG_MODE = 1 THEN PRINT "Loading ShopBot Constants..."
+
+    ' Message box button constants
+    &MSGBOX_BTN_OK = 0
+    &MSGBOX_BTN_OK_CANCEL = 1
+    &MSGBOX_BTN_ABORT_RETRY_IGNORE = 2
+    &MSGBOX_BTN_YES_NO_CANCEL = 3
+    &MSGBOX_BTN_YES_NO = 4
+    &MSGBOX_BTN_RETRY_CANCEL = 5
+
+    ' Message box icon constants
+    &MSGBOX_ICON_NONE = 0
+    &MSGBOX_ICON_CRITICAL = 16
+    &MSGBOX_ICON_QUESTION = 32
+    &MSGBOX_ICON_EXCLAMATION = 48
+    &MSGBOX_ICON_INFORMATION = 64
+
+    ' Message Box default button constants
+    &MSGBOX_DEFAULT_BTN_1 = 0
+    &MSGBOX_DEFAULT_BTN_2 = 256
+    &MSGBOX_DEFAULT_BTN_3 = 512
+    &MSGBOX_DEFAULT_BTN_4 = 768
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    ...done"
+RETURN
+
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: CheckState
+' --------------------------------------------------------------------------------------------------------------------
+
+CheckState:
+    IF &DEBUG_MODE = 1 THEN PRINT "Checking ShopBot State..."
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    Configured Plate Dimensions (in) : [", &PLATE_LENGTH_X, ", ", &PLATE_LENGTH_Y, ", ", &PLATE_LENGTH_Z, "]"
+    IF &DEBUG_MODE = 1 THEN PRINT "    Configured Speed Limits (in/sec) : ", &MAX_SPEED_APPROACH, " (Approach), ", &MAX_SPEED_JOGGING, " (Jogging)"
+
+    ' Make sure the spindle is off
+    GOSUB SpindleOff
+
+    ' Make sure the tool is positioned correctly
+    IF &DEBUG_MODE = 1 THEN PRINT "    Plate Check Message..."
+    PLAY C:\Windows\Media\ding.wav
+    MSGBOX(Is the tool positioned above the upper-part of the plate?, &MSGBOX_BTN_YES_NO + &MSGBOX_BTN_QUESTION, Ready to Zero?)
+    IF &msganswer = "No" THEN GOTO Stop
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+
+    ' Load variables from the Custom Cut 90 file (&my_ZzeroInput, &my_XYzeroSafeZ, &my_ZzeroSafeZ)
+    IF &DEBUG_MODE = 1 THEN PRINT "    Loading Custom Cut 90 Variables..."
+    C#,90
+
+    IF &DEBUG_MODE = 1 THEN PRINT "        &my_ZzeroInput  = ", &my_ZzeroInput
+    IF &DEBUG_MODE = 1 THEN PRINT "        &my_XYzeroSafeZ = ", &my_XYzeroSafeZ
+    IF &DEBUG_MODE = 1 THEN PRINT "        &my_ZzeroSafeZ  = ", &my_ZzeroSafeZ
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+
+    ' Convert our configurations to metric, if needed
+    &is_metric = %(25)
+    IF &is_metric = 1 THEN GOSUB ConvertToMetric
+
+    ' Store our current position as "home"
+    &pos_home_x = %(1)
+    &pos_home_y = %(2)
+    &pos_home_z = %(3)
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    Home Position : [", &pos_home_x, ", ", &pos_home_y, ", ", &pos_home_z, "]"
+
+    ' Set the limits for each of our axis in the direction we are testing
+    &pos_x_limit_min = %(11)
+    &pos_x_limit_max = %(12)
+    &pos_y_limit_min = %(13)
+    &pos_y_limit_max = %(14)
+    &pos_z_limit_min = %(15)
+    &pos_z_limit_max = %(16)
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    Minimum Limit : [", &pos_x_limit_min, ", ", &pos_y_limit_min, ", ", &pos_z_limit_min, "]"
+    IF &DEBUG_MODE = 1 THEN PRINT "    Maximum Limit : [", &pos_x_limit_max, ", ", &pos_y_limit_max, ", ", &pos_z_limit_max, "]"
+
+    ' Our trigger is 0 by default
+    &pos_x_trigger = 0
+    &pos_y_trigger = 0
+    &pos_z_trigger = 0
+
+    ' Load and store the configured speeds for the machine
+    &shopbot_xy_move = %(71)
+    &shopbot_z_move = %(73)
+    &shopbot_xy_jog = %(76)
+    &shopbot_z_jog = %(78)
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    ShopBot XY Speeds     : ", &shopbot_xy_move, " (Move), ", &shopbot_xy_jog, " (Jog)"
+    IF &DEBUG_MODE = 1 THEN PRINT "    ShopBot Z Speeds      : ", &shopbot_z_move, " (Move), ", &shopbot_z_jog, " (Jog)"
+
+    ' Set our speed limits, using configured settings unless they exceed our configured speed limit
+    &speed_xy_approach = &shopbot_xy_move
+    &speed_z_approach = &shopbot_z_move
+    &speed_xy_jog = &shopbot_xy_jog
+    &speed_z_jog = &shopbot_z_jog
+
+    IF &speed_xy_approach < &MAX_SPEED_APPROACH THEN &speed_xy_approach = &MAX_SPEED_APPROACH
+    IF &speed_z_approach < &MAX_SPEED_APPROACH THEN &speed_z_approach = &MAX_SPEED_APPROACH
+    IF &speed_xy_jog < &MAX_SPEED_JOG THEN &speed_xy_jog = &MAX_SPEED_JOG
+    IF &speed_z_jog < &MAX_SPEED_JOG THEN &speed_z_jog = &MAX_SPEED_JOG
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    Calibration XY Speeds : ", &speed_xy_approach, " (Approach), ", &speed_xy_jog, " (Jog)"
+    IF &DEBUG_MODE = 1 THEN PRINT "    Calibration Z Speeds  : ", &speed_z_approach, " (Approach), ", &speed_z_jog, " (Jog)"
+
+    ' Set the speed of the machine
+    MS, &speed_xy_approach, &speed_z_approach
+    JS, &speed_xy_jog, &speed_z_jog
+
+    ' If we're in preview mode, throw an exception
+    IF %(22) = 1 THEN GOTO ExceptionPreviewMode
+
+    ' Put the ShopBot in Absolute mode (so all distances are entered from 0,0)
+    IF &DEBUG_MODE = 1 THEN PRINT "    Entering Absolute Dimension mode..."
+    SA
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+
+    ' Deactivate our hardware and software limits
+    IF &DEBUG_MODE = 1 THEN PRINT "    Disabling limit switches..."
+    VN, 0
+    SF, 0
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+RETURN
+
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: ResetState
+' --------------------------------------------------------------------------------------------------------------------
+
+ResetState:
+    IF &DEBUG_MODE = 1 THEN PRINT "Resetting ShopBot state..."
+
+    ' Remove any input triggers
+    IF &DEBUG_MODE = 1 THEN PRINT "    Clearing all zeroing input triggers..."
+    ON INPUT(&my_ZzeroInput, )
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+
+    ' Jog the spindle to the home point
+    GOSUB JogHome
+
+    ' Reset the spindle movement speeds
+    IF &DEBUG_MODE = 1 THEN PRINT "    Resetting spindle movement speeds..."
+    IF &shopbot_xy_move NOT 0 THEN MS, &shopbot_xy_move, &shopbot_z_move
+    IF &shopbot_xy_jog NOT 0 JS, &shopbot_xy_jog, &shopbot_z_jog
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+
+    ' Put the ShopBot in relative mode
+    IF &DEBUG_MODE = 1 THEN PRINT "    Entering Relative Dimension mode..."
+    SR
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+
+    ' Enable limit switches
+    IF &DEBUG_MODE = 1 THEN PRINT "    Enabling limit switches..."
+    VN, 1
+    SF, 1
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+RETURN
+
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: CalibrateZAxis
+' --------------------------------------------------------------------------------------------------------------------
+
+CalibrateZAxis:
+    IF &DEBUG_MODE = 1 THEN PRINT "Calibrating the Z-Axis..."
+
+    ' Make sure our input is not live
+    GOSUB TestClear
+
+    ' Approach the Z limit, running the Trigger subroutine when the bit touches the zeroing plate
+    IF &DEBUG_MODE = 1 THEN PRINT "    Testing first-pass along the Z-axis..."
+    ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateZAxisTriggered
+    MZ, &pos_z_limit_max
+
+    ' If we hit the Z limit, throw an exception
+    IF %(3) = &pos_z_limit_max THEN GOTO ExceptionLimitReached
+
+    ' Redo the limit check with a slower approach (half-speed)
+    IF &DEBUG_MODE = 1 THEN PRINT "    Testing second-pass along the Z-axis..."
+    ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateZAxisTriggered
+    MS, , &speed_z_approach / 2
+    MZ, &pos_z_limit_max
+
+    ' If we hit the Z limit, throw an exception
+    IF %(3) = &pos_z_limit_max THEN GOTO ExceptionLimitReached
+
+    ' Store our Z-Axis as the point where it was triggered
+    &pos_z_trigger = %(3)
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    Z-Axis Trigger Point : ", &pos_z_trigger
+
+    ' Calculate the Z-Axis position for testing the X- and Y-Axes
+    &pos_z_test_point = &pos_z_trigger + &PLATE_Z_LENGTH
+
+    ' Reset our Z-Axis move speed and go home
+    MS, , &speed_z_move
+    GOSUB JogHome
+RETURN
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: CalibrateZAxisTriggered
+' --------------------------------------------------------------------------------------------------------------------
+
+CalibrateZAxisTriggered:
+    IF &DEBUG_MODE = 1 THEN PRINT "        Input triggered!  Jogging back..."
+
+    SR
+    IF &is_metric = 0 THEN JZ, -1
+    IF &is_metric = 1 THEN JZ, -25.4
+    SA
+
+    IF &DEBUG_MODE = 1 THEN PRINT "            ...done"
+RETURN
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: CalibrateXAxis
+' --------------------------------------------------------------------------------------------------------------------
+
+CalibrateXAxis:
+    ' Make sure the Z-Axis has been calibrated before running this subroutine
+    IF &pos_z_trigger = 0 THEN GOTO ExceptionZNotCalibrated
+
+    ' Make sure our input is not live
+    GOSUB TestClear
+
+    ' Jog our spindle to the test location
+    IF &DEBUG_MODE = 1 THEN PRINT "    Jogging to test location..."
+
+    &pos_x_test_point = &pos_x_home + (&PLATE_X_LENGTH * 3)
+    IF &pos_x_test_point < &pos_x_limit_min THEN GOTO ExceptionLimitReached
+    IF &pos_z_test_point > &pos_z_limit_max THEN GOTO ExceptionLimitReached
+
+    J2, &pos_x_test_point, &pos_y_home
+    JZ, &pos_z_test_point
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+
+    ' Approach the X limit, running the Trigger subroutine when the bit touches the zeroing plate
+    IF &DEBUG_MODE = 1 THEN PRINT "    Testing first-pass along the X-axis..."
+    ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateXAxisTriggered
+    MX, &pos_x_limit_max
+
+    ' If we hit the X limit, throw an exception
+    IF %(1) = &pos_x_limit_max THEN GOTO ExceptionLimitReached
+
+    ' Redo the limit check with a slower approach (half-speed)
+    IF &DEBUG_MODE = 1 THEN "    Testing second-pass along the X-axis..."
+    ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateXAxisTriggered
+    MS, &speed_xy_approach / 2
+    MX, &pos_x_limit_max
+
+    ' If we hit the X limit, throw an exception
+    IF %(1) = &pos_x_limit_max THEN GOTO ExceptionLimitReached
+
+    ' Store our X-Axis as the point where it was triggered
+    &pos_x_trigger = %(1)
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    X-Axis Trigger Point : ", &pos_x_trigger
+
+    ' Reset our XY-Axis move speed and go home
+    MS, &speed_xy_approach
+    GOSUB JogHome
+RETURN
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: CalibrateXAxisTriggered
+' --------------------------------------------------------------------------------------------------------------------
+
+CalibrateXAxisTriggered:
+    IF &DEBUG_MODE = 1 THEN PRINT "    Input triggered!  Jogging back..."
+
+    SR
+    IF &is_metric = 0 THEN JX, -1
+    IF &is_metric = 1 THEN JX, -25.4
+    SA
+
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+RETURN
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: CalibrateYAxis
+' --------------------------------------------------------------------------------------------------------------------
+
+CalibrateYAxis:
+    ' Make sure the Z-Axis has been calibrated before running this subroutine
+    IF &pos_z_trigger = 0 THEN GOTO ExceptionZNotCalibrated
+
+    ' Make sure our input is not live
+    GOSUB TestClear
+
+    ' Jog our spindle to the test location
+    IF &DEBUG_MODE = 1 THEN PRINT "    Jogging to test location..."
+
+    &pos_y_test_point = &pos_x_home + (&PLATE_X_LENGTH * 3)
+    IF &pos_y_test_point < &pos_y_limit_min THEN GOTO ExceptionLimitReached
+    IF &pos_z_test_point > &pos_z_limit_max THEN GOTO ExceptionLimitReached
+
+    J2, &pos_x_home, &pos_y_test_point
+    JZ, &pos_z_test_point
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+
+    ' Approach the Y limit, running the Trigger subroutine when the bit touches the zeroing plate
+    IF &DEBUG_MODE = 1 THEN PRINT "    Testing first-pass along the Y-axis..."
+    ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateYAxisTriggered
+    MX, &pos_y_limit_max
+
+    ' If we hit the X limit, throw an exception
+    IF %(1) = &pos_y_limit_max THEN GOTO ExceptionLimitReached
+
+    ' Redo the limit check with a slower approach (half-speed)
+    IF &DEBUG_MODE = 1 THEN "    Testing second-pass along the Y-axis..."
+    ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateYAxisTriggered
+    MS, &speed_xy_approach / 2
+    MX, &pos_y_limit_max
+
+    ' If we hit the X limit, throw an exception
+    IF %(2) = &pos_y_limit_max THEN GOTO ExceptionLimitReached
+
+    ' Store our Y-Axis as the point where it was triggered
+    &pos_x_trigger = %(2)
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    Y-Axis Trigger Point : ", &pos_y_trigger
+
+    ' Reset our XY-Axis move speed and go home
+    MS, &speed_xy_approach
+    GOSUB JogHome
+RETURN
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: CalibrateYAxisTriggered
+' --------------------------------------------------------------------------------------------------------------------
+
+CalibrateYAxisTriggered:
+    IF &DEBUG_MODE = 1 THEN PRINT "    Input triggered!  Jogging back..."
+
+    SR
+    IF &is_metric = 0 THEN JY, -1
+    IF &is_metric = 1 THEN JY, -25.4
+    SA
+
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+RETURN
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: ZeroAxes
+' --------------------------------------------------------------------------------------------------------------------
+
+ZeroAxes:
+    IF &DEBUG_MODE = 1 THEN PRINT "Zeroing axes..."
+
+    &pos_x_zero = &pos_x_trigger + &PLATE_LENGTH_X
+    &pos_y_zero = &pos_y_trigger + &PLATE_LENGTH_Y
+    &pos_z_zero = &pos_z_trigger + &PLATE_LENGTH_Z
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    New Zero Point : [", &pos_x_zero, ", ", &pos_y_zero, ", ", &pos_z_zero, "]"
+
+    VA &pos_x_trigger + &PLATE_LENGTH_X, &pos_y_trigger + &PLATE_LENGTH_Y, &pos_z_trigger + &PLATE_LENGTH_Z
+    PAUSE 1
+
+    IF &DEBUG_MODE = 1 THEN PRINT "    Moving to new zero-point..."
+    ' Go to the new [0, 0, -0.5] point
+    IF &is_metric = 0 THEN JZ, -0.5
+    IF &is_metric = 1 THEN JZ, -12.7
+    J2, 0, 0
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
+
+    IF &DEBUG_MODE = 1 THEN PRINT "Calibration Complete!"
+    PLAY C:\Windows\Media\tada.wav
+RETURN
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: SpindleOff
+' --------------------------------------------------------------------------------------------------------------------
+
+SpindleOff:
+    IF &DEBUG_MODE = 1 THEN PRINT "    Turning off spindle..."
+    TR, 0       ' Set the Spindle RPM to 0
+    C7          ' Turn off the Spindle
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done."
+RETURN
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: ConvertToMetric
+' --------------------------------------------------------------------------------------------------------------------
+
+ConvertToMetric:
+    IF &DEBUG_MODE = 1 THEN PRINT "    Converting dimensions to metric..."
+
+    ' Convert all of our settings from inches to mm
+    &PLATE_LENGTH_X = &PLATE_LENGTH_X * 25.4
+    &PLATE_LENGTH_Y = &PLATE_LENGTH_Y * 25.4
+    &PLATE_LENGTH_Z = &PLATE_LENGTH_Z * 25.4
+    &MAX_SPEED_JOGGING = &MAX_SPEED_JOGGING * 25.4
+    &MAX_SPEED_APPROACH = &MAX_SPEED_JOGGING * 25.4
+
+    IF &DEBUG_MODE = 1 THEN PRINT "        Metric Plate Dimensions (mm) : [", &PLATE_LENGTH_X, ", ", &PLATE_LENGTH_Y, ", ", &PLATE_LENGTH_Z, "]"
+    IF &DEBUG_MODE = 1 THEN PRINT "        Metric Speed Limits (mm/sec) : ", &MAX_SPEED_APPROACH, " (Approach), ", &MAX_SPEED_JOGGING, " (Jogging)"
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done."
+RETURN
+
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: TestClear
+' --------------------------------------------------------------------------------------------------------------------
+
+TestClear:
+    IF &DEBUG_MODE = 1 THEN PRINT "    Testing if input is clear..."
+    &clearSystemVar = &my_ZzeroInput + 50
+    IF %(&clearSystemVar) = 1 THEN PAUSE 3  ' Try again in 3 seconds to prevent false-negatives
+    IF %(&clearSystemVar) = 1 THEN GOTO ExceptionNotClear
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done."
+RETURN
+
+
+
+
+' --------------------------------------------------------------------------------------------------------------------
+' SUBROUTINE: JogHome
+' --------------------------------------------------------------------------------------------------------------------
+
+JogHome:
+    IF &DEBUG_MODE = 1 THEN PRINT "    Jogging home..."
+    IF &pos_home_z NOT 0 THEN JZ, &pos_home_z
+    IF &pos_home_x NOT 0 THEN J2, &pos_home_x, &pos_home_y
+    IF &DEBUG_MODE = 1 THEN PRINT "        ...done."
+RETURN
