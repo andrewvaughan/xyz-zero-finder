@@ -377,7 +377,7 @@ CalibrateXAxis:
     ' Jog our spindle to the test location
     IF &DEBUG_MODE = 1 THEN PRINT "    Jogging to test location..."
 
-    &pos_x_test_point = &pos_x_home + (&PLATE_X_LENGTH * 3)
+    &pos_x_test_point = &pos_x_home - (&PLATE_X_LENGTH * 3)
     IF &pos_x_test_point < &pos_x_limit_min THEN GOTO ExceptionLimitReached
     IF &pos_z_test_point > &pos_z_limit_max THEN GOTO ExceptionLimitReached
 
@@ -445,7 +445,7 @@ CalibrateYAxis:
     ' Jog our spindle to the test location
     IF &DEBUG_MODE = 1 THEN PRINT "    Jogging to test location..."
 
-    &pos_y_test_point = &pos_x_home + (&PLATE_X_LENGTH * 3)
+    &pos_y_test_point = &pos_y_home - (&PLATE_Y_LENGTH * 3)
     IF &pos_y_test_point < &pos_y_limit_min THEN GOTO ExceptionLimitReached
     IF &pos_z_test_point > &pos_z_limit_max THEN GOTO ExceptionLimitReached
 
@@ -456,22 +456,22 @@ CalibrateYAxis:
     ' Approach the Y limit, calling the Trigger subroutine when the bit touches the zeroing plate
     IF &DEBUG_MODE = 1 THEN PRINT "    Testing first-pass along the Y-axis..."
     ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateYAxisTriggered
-    MX, &pos_y_limit_max
+    MY, &pos_y_limit_max
 
-    ' If we hit the X limit, throw an exception
-    IF %(1) = &pos_y_limit_max THEN GOTO ExceptionLimitReached
+    ' If we hit the Y limit, throw an exception
+    IF %(2) = &pos_y_limit_max THEN GOTO ExceptionLimitReached
 
     ' Redo the limit check with a slower approach (half-speed)
     IF &DEBUG_MODE = 1 THEN "    Testing second-pass along the Y-axis..."
     ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateYAxisTriggered
     MS, &speed_xy_approach / 2
-    MX, &pos_y_limit_max
+    MY, &pos_y_limit_max
 
     ' If we hit the X limit, throw an exception
     IF %(2) = &pos_y_limit_max THEN GOTO ExceptionLimitReached
 
     ' Store our Y-Axis as the point where it was triggered
-    &pos_x_trigger = %(2)
+    &pos_y_trigger = %(2)
 
     IF &DEBUG_MODE = 1 THEN PRINT "    Y-Axis Trigger Point : ", &pos_y_trigger
 
