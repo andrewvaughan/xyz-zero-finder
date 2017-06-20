@@ -28,7 +28,7 @@
 '
 '
 ' Alternatively, the plate can be a Z-Only calibration plate.  Where the depth of the plate is recorded into the
-' '&Z_PLATE_DEPTH configuration variable.
+' &Z_PLATE_DEPTH configuration variable.
 '
 ' Directions for running the script are as follows:
 '
