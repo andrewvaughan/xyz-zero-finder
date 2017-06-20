@@ -66,6 +66,9 @@
 ' The exact thickness of the upper part of the aluminum plate (inches)
 &PLATE_LENGTH_Z = 0.5 + 0.030
 
+' The depth of the Z-Plate when only calibrating the Z-Axis (inches)
+&Z_PLATE_DEPTH = 0.25
+
 ' Speed limits for the machine when on approach and when jogging (inches/second)
 &MAX_SPEED_JOGGING = 3.5
 &MAX_SPEED_APPROACH = 0.25      ' Final-Approach will be half this speed
@@ -83,13 +86,19 @@ Restart:
 GOSUB ResetState            ' Reset the ShopBot's state (in case we're restarting)
 GOSUB CheckState            ' Ensure the ShopBot is in an appropriate configuration for calibration
 
-GOSUB CalibrateZ            ' Calibrates the Z-Axis (must be performed prior to X- and Y-Axis calibration)
+' Give our user the option of only calibrating the Z-Axis
+MSGBOX(Are you calibrating all three axes? (Click No if you are only calibrating the Z-Axis with the Z-Plate), &MSG_BTN_YES_NO_CANCEL + &MSG_ICON_QUESTION, "Select Axes")
+IF &msganswer = "Cancel" THEN GOTO Stop
+&calibrate_all = &msganswer
+
+GOSUB CalibrateZ                            ' Calibrates the Z-Axis (must be performed prior to X- and Y-Axis calibration)
+IF &calibrate_all = "No" THEN GOTO DoZero   ' Skip the other axes if we're only doing the Z-Axis
+
 GOSUB CalibrateX            ' Calibrates the X-Axis
 GOSUB CalibrateY            ' Calibrates the Y-Axis
 
+DoZero:
 GOSUB ZeroAxes              ' Stores the calibrated axes as the new zero-point
-
-Stop:
 GOSUB ResetState            ' Reset the ShopBot to its original settings
 ENDALL
 
@@ -181,7 +190,7 @@ CheckState:
     ' Make sure the tool is positioned correctly
     IF &DEBUG_MODE = 1 THEN PRINT "    Plate Check Message..."
     PLAY C:\Windows\Media\ding.wav
-    MSGBOX(Is the tool positioned above the upper-part of the plate?, &MSGBOX_BTN_YES_NO + &MSGBOX_BTN_QUESTION, Ready to Zero?)
+    MSGBOX(Is the tool positioned above the appropriate zeroing plate?, &MSGBOX_BTN_YES_NO + &MSGBOX_BTN_QUESTION, Ready to Zero?)
     IF &msganswer = "No" THEN GOTO Stop
     IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
 
@@ -348,6 +357,7 @@ RETURN
 
 
 
+
 ' --------------------------------------------------------------------------------------------------------------------
 ' SUBROUTINE: CalibrateZAxisTriggered
 ' --------------------------------------------------------------------------------------------------------------------
@@ -362,6 +372,7 @@ CalibrateZAxisTriggered:
 
     IF &DEBUG_MODE = 1 THEN PRINT "            ...done"
 RETURN
+
 
 
 
@@ -418,6 +429,7 @@ RETURN
 
 
 
+
 ' --------------------------------------------------------------------------------------------------------------------
 ' SUBROUTINE: CalibrateXAxisTriggered
 ' --------------------------------------------------------------------------------------------------------------------
@@ -432,6 +444,7 @@ CalibrateXAxisTriggered:
 
     IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
 RETURN
+
 
 
 
@@ -488,6 +501,7 @@ RETURN
 
 
 
+
 ' --------------------------------------------------------------------------------------------------------------------
 ' SUBROUTINE: CalibrateYAxisTriggered
 ' --------------------------------------------------------------------------------------------------------------------
@@ -505,6 +519,7 @@ RETURN
 
 
 
+
 ' --------------------------------------------------------------------------------------------------------------------
 ' SUBROUTINE: ZeroAxes
 ' --------------------------------------------------------------------------------------------------------------------
@@ -512,17 +527,21 @@ RETURN
 ZeroAxes:
     IF &DEBUG_MODE = 1 THEN PRINT "Zeroing axes..."
 
-    &pos_x_zero = &pos_x_trigger + &PLATE_LENGTH_X
-    &pos_y_zero = &pos_y_trigger + &PLATE_LENGTH_Y
-    &pos_z_zero = &pos_z_trigger + &PLATE_LENGTH_Z
+    &pos_x_zero = 0
+    &pos_y_zero = 0
+    IF &calibrate_all = "No" THEN &pos_z_zero = &pos_z_trigger + &Z_PLATE_DEPTH
+
+    IF &calibrate_all = "Yes" THEN &pos_z_zero = &pos_z_trigger + &PLATE_LENGTH_Z
+    IF &calibrate_all = "Yes" THEN &pos_x_zero = &pos_x_trigger + &PLATE_LENGTH_X
+    IF &calibrate_all = "yes" THEN &pos_y_zero = &pos_y_trigger + &PLATE_LENGTH_Y
+
+    VA, &pos_x_zero, &pos_y_zero, &pos_z_zero
+    PAUSE 1
 
     IF &DEBUG_MODE = 1 THEN PRINT "    New Zero Point : [", &pos_x_zero, ", ", &pos_y_zero, ", ", &pos_z_zero, "]"
 
-    VA &pos_x_zero, &pos_y_zero, &pos_z_zero
-    PAUSE 1
-
     ' Go to the new [0, 0, -0.5] point
-    IF &DEBUG_MODE = 1 THEN PRINT "    Moving above new zero-point..."
+    IF &DEBUG_MODE = 1 THEN PRINT "    Moving 0.5" above new zero-point..."
     IF &is_metric = 0 THEN JZ, -0.5
     IF &is_metric = 1 THEN JZ, -12.7
     J2, 0, 0
@@ -531,6 +550,7 @@ ZeroAxes:
     IF &DEBUG_MODE = 1 THEN PRINT "Calibration Complete!"
     PLAY C:\Windows\Media\tada.wav
 RETURN
+
 
 
 
@@ -544,6 +564,7 @@ SpindleOff:
     C7          ' Turn off the Spindle
     IF &DEBUG_MODE = 1 THEN PRINT "        ...done."
 RETURN
+
 
 
 
