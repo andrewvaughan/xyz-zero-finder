@@ -192,7 +192,7 @@ CheckState:
     ' Make sure the tool is positioned correctly
     IF &DEBUG_MODE = 1 THEN PRINT "    Plate Check Message..."
     PLAY C:\Windows\Media\ding.wav
-    MSGBOX(Is the tool positioned above the appropriate zeroing plate?, &MSGBOX_BTN_YES_NO + &MSGBOX_BTN_QUESTION, Ready to Zero?)
+    MSGBOX(Is the tool positioned above the appropriate zeroing plate (XYZ-plate for three-axis calibration, or Z-Plate for Z-only calibration)?, &MSGBOX_BTN_YES_NO + &MSGBOX_BTN_QUESTION, Ready to Zero?)
     IF &msganswer = "No" THEN GOTO Stop
     IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
 
