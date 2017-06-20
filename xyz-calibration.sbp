@@ -319,6 +319,7 @@ CalibrateZAxis:
 
     ' If we hit the Z limit, throw an exception
     IF %(3) = &pos_z_limit_max THEN GOTO ExceptionLimitReached
+    IF %(3) > &pos_z_limit_max THEN GOTO ExceptionLimitReached
 
     ' Redo the limit check with a slower approach (half-speed)
     IF &DEBUG_MODE = 1 THEN PRINT "    Testing second-pass along the Z-axis..."
@@ -328,6 +329,7 @@ CalibrateZAxis:
 
     ' If we hit the Z limit, throw an exception
     IF %(3) = &pos_z_limit_max THEN GOTO ExceptionLimitReached
+    IF %(3) > &pos_z_limit_max THEN GOTO ExceptionLimitReached
 
     ' Store our Z-Axis as the point where it was triggered
     &pos_z_trigger = %(3)
@@ -392,6 +394,7 @@ CalibrateXAxis:
 
     ' If we hit the X limit, throw an exception
     IF %(1) = &pos_x_limit_max THEN GOTO ExceptionLimitReached
+    IF %(1) > &pos_x_limit_max THEN GOTO ExceptionLimitReached
 
     ' Redo the limit check with a slower approach (half-speed)
     IF &DEBUG_MODE = 1 THEN "    Testing second-pass along the X-axis..."
@@ -401,6 +404,7 @@ CalibrateXAxis:
 
     ' If we hit the X limit, throw an exception
     IF %(1) = &pos_x_limit_max THEN GOTO ExceptionLimitReached
+    IF %(1) > &pos_x_limit_max THEN GOTO ExceptionLimitReached
 
     ' Store our X-Axis as the point where it was triggered
     &pos_x_trigger = %(1)
@@ -460,6 +464,7 @@ CalibrateYAxis:
 
     ' If we hit the Y limit, throw an exception
     IF %(2) = &pos_y_limit_max THEN GOTO ExceptionLimitReached
+    IF %(2) > &pos_y_limit_max THEN GOTO ExceptionLimitReached
 
     ' Redo the limit check with a slower approach (half-speed)
     IF &DEBUG_MODE = 1 THEN "    Testing second-pass along the Y-axis..."
@@ -469,6 +474,7 @@ CalibrateYAxis:
 
     ' If we hit the X limit, throw an exception
     IF %(2) = &pos_y_limit_max THEN GOTO ExceptionLimitReached
+    IF %(2) > &pos_y_limit_max THEN GOTO ExceptionLimitReached
 
     ' Store our Y-Axis as the point where it was triggered
     &pos_y_trigger = %(2)
