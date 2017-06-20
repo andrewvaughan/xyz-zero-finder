@@ -103,28 +103,36 @@ ENDALL
 ExceptionPreviewMode:
     IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Preview Mode **************************"
     PLAY C:\Windows\Media\ding.wav
-    MSGBOX(Cannot Continue!  ShopBot in Preview Mode.  Please check that the ShopBot is turned on and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+
+    &flags = &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL
+    MSGBOX(Cannot Continue!  ShopBot in Preview Mode.  Please check that the ShopBot is turned on and try again., &flags, Exception!)
     IF &msganswer = "Retry" THEN GOTO Restart
 GOTO Stop
 
 ExceptionNotClear:
     IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Input Not Clear ***********************"
     PLAY C:\Windows\Media\ding.wav
-    MSGBOX(Cannot Continue!  The input for zeroing is stuck in the on position.  Please check that there is not a short in the circuit, and that the spindle and bit are not touching the zeroing plate, and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+
+    &flags = &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL
+    MSGBOX(Cannot Continue!  The input for zeroing is stuck in the on position.  Please check that there is not a short in the circuit, and that the spindle and bit are not touching the zeroing plate, and try again., &flags, Exception!)
     IF &msganswer = "Retry" THEN GOTO Restart
 GOTO Stop
 
 ExceptionZNotCalibrated:
     IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Z-Axis Not Calibrated *****************"
     PLAY C:\Windows\Media\ding.wav
-    MSGBOX(Cannot Continue!  The Z-Axis must be calibrated prior to calibrating the X or Y axes., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+
+    &flags = &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL
+    MSGBOX(Cannot Continue!  The Z-Axis must be calibrated prior to calibrating the X or Y axes., &flags, Exception!)
     IF &msganswer = "Retry" THEN GOTO Restart
 GOTO Stop
 
 ExceptionLimitReached:
     IF &DEBUG_MODE = 1 THEN PRINT "*** EXCEPTION: Axis Limit Reached ********************"
     PLAY C:\Windows\Media\ding.wav
-    MSGBOX(Cannot Continue!  One of the ShopBot axis limits has been reached.  Please check that the zeroing plate is properly placed, and that your material is far enough away from the edges to allow calibration, and try again., &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL, Exception!)
+
+    &flags = &MSGBOX_BTN_RETRY_CANCEL + &MSGBOX_BTN_CRITICAL
+    MSGBOX(Cannot Continue!  One of the ShopBot axis limits has been reached.  Please check that the zeroing plate is properly placed, and that your material is far enough away from the edges to allow calibration, and try again., &flags, Exception!)
     IF &msganswer = "Retry" THEN GOTO Restart
 GOTO Stop
 
@@ -181,7 +189,9 @@ CheckState:
     ' Make sure the tool is positioned correctly
     IF &DEBUG_MODE = 1 THEN PRINT "    Plate Check Message..."
     PLAY C:\Windows\Media\ding.wav
-    MSGBOX(Is the tool positioned above the upper-part of the plate?, &MSGBOX_BTN_YES_NO + &MSGBOX_BTN_QUESTION, Ready to Zero?)
+
+    &flags = &MSGBOX_BTN_YES_NO + &MSGBOX_BTN_QUESTION
+    MSGBOX(Is the tool positioned above the upper-part of the plate?, &flags, Ready to Zero?)
     IF &msganswer = "No" THEN GOTO Stop
     IF &DEBUG_MODE = 1 THEN PRINT "        ...done"
 
@@ -324,7 +334,9 @@ CalibrateZAxis:
     ' Redo the limit check with a slower approach (half-speed)
     IF &DEBUG_MODE = 1 THEN PRINT "    Testing second-pass along the Z-axis..."
     ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateZAxisTriggered
-    MS, , &speed_z_approach / 2
+
+    &slow_speed = &speed_z_approach / 2
+    MS, , &slow_speed
     MZ, &pos_z_limit_max
 
     ' If we hit the Z limit, throw an exception
@@ -399,7 +411,9 @@ CalibrateXAxis:
     ' Redo the limit check with a slower approach (half-speed)
     IF &DEBUG_MODE = 1 THEN "    Testing second-pass along the X-axis..."
     ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateXAxisTriggered
-    MS, &speed_xy_approach / 2
+
+    &slow_speed = &speed_xy_approach / 2
+    MS, &slow_speed
     MX, &pos_x_limit_max
 
     ' If we hit the X limit, throw an exception
@@ -469,7 +483,9 @@ CalibrateYAxis:
     ' Redo the limit check with a slower approach (half-speed)
     IF &DEBUG_MODE = 1 THEN "    Testing second-pass along the Y-axis..."
     ON INPUT(&my_ZzeroInput, 1) GOSUB CalibrateYAxisTriggered
-    MS, &speed_xy_approach / 2
+
+    &slow_speed = &speed_xy_approach / 2
+    MS, &slow_speed
     MY, &pos_y_limit_max
 
     ' If we hit the X limit, throw an exception
