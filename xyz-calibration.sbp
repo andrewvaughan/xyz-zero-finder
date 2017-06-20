@@ -1,16 +1,8 @@
 ' ====================================================================================================================
 ' XYZ Calibration Script for ShopBot
 '
-' This script is intended to be used with a zeroing plate.  The script will use the plate, tied to one of the inputs
-' on the ShopBot, to determine the zero-values for each of the X-, Y-, and Z-Axes.  To run this script, please follow
-' these directions:
-'
-'     1) Connect the wire on the zeroing plate to the proper input on the ShopBot
-'     2) Clip the ground alligator clip on the zeroing plate to a metal piece on the ShopBot that connects to the bit
-'     3) Using the ShopBot move controls, position the bit above the main (elevated) part of the zeroing plate
-'     4) Run this script using the ShopBot control application
-'
-' Zeroing Plate Dimensions:
+' This script is intended to be used with a zeroing plate.  The zeroing plate can be either an XYZ zeroing plate,
+' with dimensions as follows:
 '
 '  * &PLATE_X_LENGTH is the length of the extrusion along the X-Axis
 '  * &PLATE_Y_LENGTH is the length of the extrusion along the Y-Axis
@@ -34,6 +26,16 @@
 ' ▼ +----------------------------------------+ |
 '    \________________________________________\,
 '
+'
+' Alternatively, the plate can be a Z-Only calibration plate.  Where the depth of the plate is recorded into the
+' '&Z_PLATE_DEPTH configuration variable.
+'
+' Directions for running the script are as follows:
+'
+'     1) Connect the wire on the chosen zeroing plate to the proper input on the ShopBot
+'     2) Clip the ground alligator clip on the zeroing plate to a metal piece on the ShopBot that connects to the bit
+'     3) Using the ShopBot move controls, position the bit above the main (elevated) part of the zeroing plate
+'     4) Run this script using the ShopBot control application
 '
 ' This script is based on ShopBot's Zero.sbp script and Barry Rimmer's xyz-zero program.
 '
@@ -87,7 +89,7 @@ GOSUB ResetState            ' Reset the ShopBot's state (in case we're restartin
 GOSUB CheckState            ' Ensure the ShopBot is in an appropriate configuration for calibration
 
 ' Give our user the option of only calibrating the Z-Axis
-MSGBOX(Are you calibrating all three axes? (Click No if you are only calibrating the Z-Axis with the Z-Plate), &MSG_BTN_YES_NO_CANCEL + &MSG_ICON_QUESTION, "Select Axes")
+MSGBOX(Are you calibrating all three axes? (Click No to only calibrate the Z-Axis using the Z-Plate), &MSG_BTN_YES_NO_CANCEL + &MSG_ICON_QUESTION, "Select Axes")
 IF &msganswer = "Cancel" THEN GOTO Stop
 &calibrate_all = &msganswer
 
